@@ -1,252 +1,117 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
-import moment from 'moment';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 
-function Timer({ interval, style }) {
-  const pad = (n) => n < 10 ? '0' + n : n;
-  const duration = moment.duration(interval);
-  const centiseconds = Math.floor(duration.milliseconds() / 10);
-  return (
-    <View style={styles.timerContainer}>
-      <Text style={style}>{pad(duration.minutes())}:</Text>
-      <Text style={style}>{pad(duration.seconds())},</Text>
-      <Text style={style}>{pad(centiseconds)}</Text>
-    </View>
-  );
-}
-
-function RoundButton({ title, color, background, onPress, disabled }) {
-  return (
-    <TouchableOpacity
-      onPress={() => !disabled && onPress()}
-      style={[styles.button, { backgroundColor: background }]}
-      activeOpacity={disabled ? 1.0 : 0.7}
-    >
-      <View style={styles.buttonBorder}>
-        <Text style={[styles.buttonTitle, { color }]}>{title}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function Lap({ number, interval, fastest, slowest }) {
-  const lapStyle = [
-    styles.lapText,
-    fastest && styles.fastest,
-    slowest && styles.slowest,
-  ];
-  return (
-    <View style={styles.lap}>
-      <Text style={lapStyle}>Lap {number}</Text>
-      <Timer style={[lapStyle, styles.lapTimer]} interval={interval}/>
-    </View>
-  );
-}
-
-function LapsTable({ laps, timer }) {
-  const finishedLaps = laps.slice(1);
-  let min = Number.MAX_SAFE_INTEGER;
-  let max = Number.MIN_SAFE_INTEGER;
-  if (finishedLaps.length >= 2) {
-    finishedLaps.forEach(lap => {
-      if (lap < min) min = lap;
-      if (lap > max) max = lap;
-    });
-  }
-  return (
-    <ScrollView style={styles.scrollView}>
-      {laps.map((lap, index) => (
-        <Lap
-          number={laps.length - index}
-          key={laps.length - index}
-          interval={index === 0 ? timer + lap : lap}
-          fastest={lap === min}
-          slowest={lap === max}
-        />
-      ))}
-    </ScrollView>
-  );
-}
-
-function ButtonsRow({ children }) {
-  return (
-    <View style={styles.buttonsRow}>{children}</View>
-  );
-}
-
-export default function App() {
-  const [start, setStart] = useState(0);
-  const [now, setNow] = useState(0);
+const App = () => {
+  const [milliseconds, setMilliseconds] = useState(0);
+  const [running, setRunning] = useState(false);
   const [laps, setLaps] = useState([]);
 
   useEffect(() => {
-    let timer;
-    if (start) {
-      timer = setInterval(() => {
-        setNow(new Date().getTime());
-      }, 100);
+    let interval;
+    if (running) {
+      interval = setInterval(() => {
+        setMilliseconds(prevTime => prevTime + 10);
+      }, 10);
     }
-    return () => clearInterval(timer);
-  }, [start]);
+    return () => clearInterval(interval);
+  }, [running]);
 
-  const startTimer = () => {
-    const now = new Date().getTime();
-    setStart(now);
-    setNow(now);
-    setLaps([0]);
+  const handleStartStop = () => {
+    if (running) {
+      setRunning(false);
+    } else {
+      setRunning(true);
+    }
   };
 
-  const lap = () => {
-    const timestamp = new Date().getTime();
-    const [firstLap, ...other] = laps;
-    setLaps([0, firstLap + now - start, ...other]);
-    setStart(timestamp);
-    setNow(timestamp);
+  const handleLapReset = () => {
+    if (running) {
+      setLaps([...laps, milliseconds]);
+    } else {
+      setMilliseconds(0);
+      setLaps([]);
+    }
   };
 
-  const stop = () => {
-    const [firstLap, ...other] = laps;
-    setLaps([firstLap + now - start, ...other]);
-    setStart(0);
-    setNow(0);
+  const formatTime = millis => {
+    const minutes = Math.floor(millis / 60000);
+    const seconds = ((millis % 60000) / 1000).toFixed(2);
+    return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
-
-  const reset = () => {
-    setLaps([]);
-    setStart(0);
-    setNow(0);
-  };
-
-  const resume = () => {
-    const now = new Date().getTime();
-    setStart(now);
-    setNow(now);
-  };
-
-  const timer = now - start;
 
   return (
     <View style={styles.container}>
-      <Timer
-        interval={laps.reduce((total, curr) => total + curr, 0) + timer}
-        style={styles.timer}
-      />
-      {laps.length === 0 && (
-        <ButtonsRow>
-          <RoundButton
-            title='Lap'
-            color='#8B8B90'
-            background='#151515'
-            disabled
-          />
-          <RoundButton
-            title='Start'
-            color='#50D167'
-            background='#1B361F'
-            onPress={startTimer}
-          />
-        </ButtonsRow>
-      )}
-      {start > 0 && (
-        <ButtonsRow>
-          <RoundButton
-            title='Lap'
-            color='#FFFFFF'
-            background='#3D3D3D'
-            onPress={lap}
-          />
-          <RoundButton
-            title='Stop'
-            color='#E33935'
-            background='#3C1715'
-            onPress={stop}
-          />
-        </ButtonsRow>
-      )}
-      {laps.length > 0 && start === 0 && (
-        <ButtonsRow>
-          <RoundButton
-            title='Reset'
-            color='#FFFFFF'
-            background='#3D3D3D'
-            onPress={reset}
-          />
-          <RoundButton
-            title='Start'
-            color='#50D167'
-            background='#1B361F'
-            onPress={resume}
-          />
-        </ButtonsRow>
-      )}
-      <LapsTable laps={laps} timer={timer}/>
+      <Text style={styles.timerText}>{formatTime(milliseconds)}</Text>
+      <View style={styles.buttonWrapper}>
+        <TouchableOpacity onPress={handleLapReset} style={styles.button}>
+          <Text>{running ? 'Lap' : 'Reset'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleStartStop} style={[styles.button, running ? styles.stopButton : styles.startButton]}>
+          <Text>{running ? 'Stop' : 'Start'}</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.lapsWrapper}>
+        {laps.map((lap, index) => (
+          <View key={index} style={styles.lap}>
+            <Text style={styles.lapText}>Lap #{index + 1}</Text>
+            <Text style={styles.lapText}>{formatTime(lap)}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#0D0D0D',
+    flex: 3,
     alignItems: 'center',
-    paddingTop: 130,
-    paddingHorizontal: 20,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor:'gray',
   },
-  timer: {
-    color: '#FFFFFF',
-    fontSize: 76,
-    fontWeight: '200',
-    width: 110,
+  timerText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    marginVertical: 30,
+  },
+  buttonWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginBottom: 30,
   },
   button: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  buttonTitle: {
-    fontSize: 18,
-  },
-  buttonBorder: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    borderWidth: 5,
+    
   },
-  buttonsRow: {
-    flexDirection: 'row',
-    alignSelf: 'stretch',
-    justifyContent: 'space-between',
-    marginTop: 80,
-    marginBottom: 30,
+  startButton: {
+    borderColor: '#7C93C3',
   },
-  lapText: {
-    color: '#FFFFFF',
-    fontSize: 18,
+  stopButton: {
+    borderColor: 'red',
   },
-  lapTimer: {
-    width: 30,
+  lapsWrapper: {
+    width: '100%',
   },
   lap: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderColor: '#151515',
-    borderTopWidth: 1,
-    paddingVertical: 10,
+    borderColor: '#435585',
+    borderWidth: 1,
+    padding: 10,
+    marginTop: 10,
+    backgroundColor:'#FF9900',
   },
-  scrollView: {
-    alignSelf: 'stretch',
+  lapText: {
+    fontSize: 16,
+    
   },
-  fastest: {
-    color: '#4BC05F',
-  },
-  slowest: {
-    color: '#CC3531',
-  },
-  timerContainer: {
-    flexDirection: 'row',
-  }
-})
+});
+
+export default App;
